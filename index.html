@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOMEPAGE - Terminal</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous">
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx" crossorigin="anonymous"></script>
+    <style>
+        body {
+            background-color: black;
+            margin: 0;
+            padding: 10px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        @font-face {
+            font-family: 'Terminus';
+            src: url('Terminus.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+
+        #terminal-output p,
+        #terminal-output h2,
+        #terminal-output ul,
+        #terminal-output li {
+            font-family: 'Terminus', monospace;
+            color: rgb(215, 215, 215);
+            font-size: 16px;
+            white-space: pre-wrap;
+            margin: 5px 0;
+            line-height: 1.2;
+        }
+
+        #terminal-output h2 {
+            color: #00ff00;
+            font-size: 18px;
+            margin-top: 15px;
+        }
+
+        #terminal-output ul {
+            list-style: none;
+            padding-left: 15px;
+        }
+
+        #terminal-output li::before {
+            content: "* ";
+            color: #00ff00;
+        }
+
+        #password, #password-prompt, #login-prompt, #username {
+            display: inline;
+        }
+
+        #spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Terminus', monospace;
+            font-size: 10px;
+            line-height: 1;
+            color: #fff;
+            white-space: pre;
+        }
+
+        #loadingText {
+            position: absolute;
+            left: 50%;
+            bottom: 10%;
+            transform: translateX(-50%);
+            font-family: 'Terminus', monospace;
+            font-size: 18px;
+            color: #fff;
+            z-index: 999;
+            white-space: pre;
+        }
+
+        #terminal-output {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            overflow-y: auto;
+            display: none;
+            width: 100%;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: flex-start;
+        }
+
+        #login-info {
+            text-align: center;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+
+        #login-info p {
+            margin: 2px 0;
+        }
+
+        .blinking-cursor {
+            font-weight: bold;
+            color: rgb(215, 215, 215);
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink {
+
+            from,
+            to {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <pre id="spinner"></pre>
+    <pre id="loadingText"></pre>
+
+    <div id="terminal-output">
+        <p id="login-prompt"></p>
+        <p id="username"></p>
+        <p id="password-prompt"></p>
+        <p id="password"></p>
+        <p id="auth-success"></p>
+        <p id="last-login"></p>
+        <p id="welcome"></p>
+
+        <div id="login-info">
+            <p id="initial-name"></p>
+            <p id="initial-contact"></p>
+            <p id="initial-links"></p>
+            <p id="initial-location"></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const body = document.body;
+            const spinner = document.getElementById('spinner');
+            const loadingText = document.getElementById('loadingText');
+            const terminalOutput = document.getElementById('terminal-output');
+            const loginInfo = document.getElementById('login-info');
+
+            var width = 35;
+            var height = 35;
+            var A = 0, B = 0;
+            var R1 = 0.5, R2 = 1.0;
+            var K2 = 30;
+            var K1 = width * K2 * 3 / (8 * (R1 + R2));
+            var chars = ".,-~:;=!*#$@";
+            function renderFrame() {
+                var output = [], zbuffer = [];
+                for (var i = 0; i < width * height; i++) { output[i] = ' '; zbuffer[i] = 0; }
+                A += 0.04; B += 0.02;
+                var cA = Math.cos(A), sA = Math.sin(A), cB = Math.cos(B), sB = Math.sin(B);
+                for (var theta = 0; theta < 6.28; theta += 0.1) {
+                    var ct = Math.cos(theta), st = Math.sin(theta);
+                    for (var phi = 0; phi < 6.28; phi += 0.1) {
+                        var cp = Math.cos(phi), sp = Math.sin(phi);
+                        var circleX = R2 + R1 * ct, circleY = R1 * st;
+                        var x = circleX * (cp * cB + sp * sA * sB) - circleY * cA * sB;
+                        var y = circleX * (cp * sB - sp * sA * cB) + circleY * cA * cB;
+                        var z = K2 + cA * circleX * sp + circleY * sA;
+                        var ooz = 1 / z;
+                        var xp = Math.floor(width / 2 + K1 * ooz * x), yp = Math.floor(height / 2 - K1 * ooz * y);
+                        var L = cp * ct * sB - cA * ct * sp - sA * st + cB * (cA * st - ct * sA * sp);
+                        if (L > 0 && yp >= 0 && yp < height && xp >= 0 && xp < width && ooz > zbuffer[yp * width + xp]) {
+                            zbuffer[yp * width + xp] = ooz;
+                            var lumIdx = Math.floor(L * 8);
+                            output[yp * width + xp] = chars[lumIdx > 0 ? lumIdx : 0];
+                        }
+                    }
+                }
+                var text = "";
+                for (var r = 0; r < height; r++) { text += output.slice(r * width, (r + 1) * width).join('') + "\n"; }
+                spinner.textContent = text;
+            }
+            var donutInterval = setInterval(renderFrame, 60);
+
+            let t = 0;
+            function animateLoadingText() {
+                t += 0.1;
+                var amplitude = 1;
+                var offset = Math.floor(Math.sin(t) * amplitude);
+                var spaces = " ".repeat(amplitude + offset);
+                loadingText.textContent = spaces + "LOADING...";
+            }
+            var loadingInterval = setInterval(animateLoadingText, 100);
+
+            function typeWriter(elementId, text, speed, callback) {
+                const element = document.getElementById(elementId);
+                if (!element) return;
+                let i = 0;
+                element.innerHTML = "";
+
+                function type() {
+                    if (i < text.length) {
+                        if (text.charAt(i) === '\n') {
+                            element.innerHTML += '<br>';
+                        } else {
+                            element.innerHTML += text.charAt(i);
+                        }
+                        i++;
+                        setTimeout(type, speed);
+                    } else if (callback) {
+                        element.innerHTML = element.innerHTML.replace('<span class="blinking-cursor">_</span>', '');
+                        callback();
+                    }
+                }
+
+                element.innerHTML = '<span class="blinking-cursor">_</span>';
+                setTimeout(type, speed);
+            }
+
+            let currentStep = 0;
+            const loadingDuration = 4000;
+            const typingSpeedFast = 5;
+            const typingSpeedSlow = 100;
+            const typingSpeedCV = 5;
+            const typingSpeedInitialInfo = 10;
+
+            setTimeout(() => {
+                clearInterval(donutInterval);
+                clearInterval(loadingInterval);
+                spinner.remove();
+                loadingText.remove();
+                terminalOutput.style.display = 'block';
+
+                const cvContent = [
+                    { type: 'p', id: 'login-prompt', text: 'AOS 1.01.11 LTS tty4 login: ' },
+                    { type: 'p', id: 'username', text: 'Ali_ElHourch\n' },
+                    { type: 'p', id: 'password-prompt', text: 'Password: ' },
+                    { type: 'p', id: 'password', text: '*******\n' },
+                    { type: 'p', id: 'auth-success', text: 'Authentication successful. Loading profile...' },
+                    { type: 'p', id: 'last-login', text: `Last login: ${new Date().toString()} on tty4` },
+                    { type: 'p', id: 'welcome', text: 'Welcome back!' },
+                    { type: 'p', id: 'initial-name', text: 'Ali El Hourch' },
+                    { type: 'p', id: 'initial-contact', text: 'ali.elhourch@uit.ac.ma | +212 659922111' },
+                    { type: 'p', id: 'initial-links', text: '<a href="#">LinkedIn</a> | <a href="#">GitHub</a>' },
+                    { type: 'p', id: 'initial-location', text: 'Kenitra, Maroc' },
+                    { type: 'h2', id: 'header1', text: 'RÉSUMÉ PROFESSIONNEL' },
+                    { type: 'p', id: 'summary-line1', text: '--------------------' },
+                    { type: 'p', id: 'summary-line2', text: 'Étudiant en deuxième année de Licence passionné de programmation, avec plus de 9 ans d\'expérience en développement' },
+                    { type: 'p', id: 'summary-line3', text: 'de jeux (LuaU) et connaissances approfondies en Intelligence Artificielle, développement web et gestion de projets' },
+                    { type: 'p', id: 'summary-line4', text: 'techniques. Actuellement à la recherche d\'un stage en IA ou en développement logiciel afin d\'enrichir mes compétences et de' },
+                    { type: 'p', id: 'summary-line5', text: 'contribuer activement à des projets innovants.' },
+                    { type: 'p', id: 'empty-line1', text: '' },
+                    { type: 'h2', id: 'header2', text: 'PRINCIPALES RÉALISATIONS' },
+                    { type: 'p', id: 'achievements-line1', text: '-------------------------' },
+                    { type: 'p', id: 'achievement1', text: '☐ Création de deux jeux Roblox cumulant 211,200+ visiteurs.' },
+                    { type: 'p', id: 'achievement2', text: '☐ Responsable technique de la plateforme éducative SpaceUIT, intégrant des assistants IA avancés (ChatGPT 4o-mini,' },
+                    { type: 'p', id: 'achievement3', text: '  Gemini 2.0 Flash).' },
+                    { type: 'p', id: 'achievement4', text: '☐ Fondateur et chef de projet pour Club SpaceFSK, gestion de projets innovants (Arduino, ESP32, Raspberry Pi).' },
+                    { type: 'p', id: 'empty-line2', text: '' },
+                    { type: 'h2', id: 'header3', text: 'ÉDUCATION' },
+                    { type: 'p', id: 'education-line1', text: '---------' },
+                    { type: 'p', id: 'education1', text: 'Université Ibn Tofail, Kenitra                                     2023 - présent' },
+                    { type: 'p', id: 'education2', text: '  Licence (2ème année en cours) en Intelligence Artificielle,' },
+                    { type: 'p', id: 'education3', text: '  Informatique Appliquée (Diplôme attendu: 2026)' },
+                    { type: 'p', id: 'empty-line3', text: '' },
+                    { type: 'p', id: 'education4', text: 'Baccalauréat marocain Sciences Physiques (Mention Bien)              2023' },
+                    { type: 'p', id: 'empty-line4', text: '' },
+                    { type: 'p', id: 'education5', text: 'Certification CS50 Introduction to programming with Python           Mars 2025' },
+                    { type: 'p', id: 'education6', text: '  (Harvard University)' },
+                    { type: 'p', id: 'empty-line5', text: '' },
+                    { type: 'h2', id: 'header4', text: 'EXPÉRIENCE' },
+                    { type: 'p', id: 'experience-line1', text: '----------' },
+                    { type: 'p', id: 'experience1', text: 'Responsable Projet Technique, SpaceUIT                             2024 - présent' },
+                    { type: 'p', id: 'experience2', text: '  ☐ Développement et maintenance d\'une plateforme éducative avec' },
+                    { type: 'p', id: 'experience3', text: '    intégration d\'assistants IA.' },
+                    { type: 'p', id: 'experience4', text: '  ☐ Configuration avancée des environnements de développement' },
+                    { type: 'p', id: 'experience5', text: '    (VS Code, GitHub).' },
+                    { type: 'p', id: 'empty-line6', text: '' },
+                    { type: 'p', id: 'experience6', text: 'Fondateur & Chef de projet, Club SpaceFSK                          2024 - présent' },
+                    { type: 'p', id: 'experience7', text: '  ☐ Direction de projets électroniques et informatiques innovants.' },
+                    { type: 'p', id: 'empty-line7', text: '' },
+                    { type: 'p', id: 'experience8', text: 'Développeur Jeux Roblox                                            2022 - présent' },
+                    { type: 'p', id: 'experience9', text: '  ☐ Création de jeux immersifs avec une équipe collaborative.' },
+                    { type: 'p', id: 'empty-line8', text: '' },
+                    { type: 'h2', id: 'header5', text: 'COMPÉTENCES TECHNIQUES' },
+                    { type: 'p', id: 'skills-line1', text: '----------------------' },
+                    { type: 'p', id: 'skill1', text: 'Langages:     C, C++ (OOP), JavaScript (OOP), Python (OOP), LuaU,' },
+                    { type: 'p', id: 'skill2', text: '              Assembleur x86, SQL, Bash' },
+                    { type: 'p', id: 'skill3', text: 'Frameworks:   Express.js, Vue.js, React.js, Angular.js' },
+                    { type: 'p', id: 'skill4', text: 'Technologies: Node.js, Catia V5, Linux, SQLite3, MySQL, LaTeX,' },
+                    { type: 'p', id: 'skill5', text: '              HTML, CSS, Gemini API, OpenAI API, Arduino,' },
+                    { type: 'p', id: 'skill6', text: '              Raspberry Pi, Git, Roblox Studio' },
+                    { type: 'p', id: 'skill7', text: 'Méthodologies: Agile, Gestion de projet, SDLC' },
+                    { type: 'p', id: 'empty-line9', text: '' },
+                    { type: 'h2', id: 'header6', text: 'FORMATION UNIVERSITAIRE (MODULES CLÉS)' },
+                    { type: 'p', id: 'modules-line1', text: '------------------------------------' },
+                    { type: 'p', id: 'module1', text: '☐ Architecture des ordinateurs et assembleur 8086: 20/20' },
+                    { type: 'p', id: 'module2', text: '☐ Programmation web 1:                             17/20' },
+                    { type: 'p', id: 'module3', text: '☐ Algorithmique 2:                                  17.5/20' },
+                    { type: 'p', id: 'module4', text: '☐ Programmation en C:                              15/20' },
+                    { type: 'p', id: 'module5', text: '☐ Systèmes d\'exploitation 1:                       17.76/20' },
+                    { type: 'p', id: 'empty-line10', text: '' },
+                    { type: 'h2', id: 'header7', text: 'COMPÉTENCES LINGUISTIQUES' },
+                    { type: 'p', id: 'languages-line1', text: '-------------------------' },
+                    { type: 'p', id: 'language1', text: 'Arabe (natif), Anglais (C1), Français (B2)' },
+                    { type: 'p', id: 'empty-line11', text: '' },
+                    { type: 'h2', id: 'header8', text: 'INTÉRÊTS' },
+                    { type: 'p', id: 'interests-line1', text: '--------' },
+                    { type: 'p', id: 'interest1', text: 'Développement de jeux, électronique embarquée, conception assistée' },
+                    { type: 'p', id: 'interest2', text: 'par ordinateur, robotique, musique (violon), jeux vidéo' },
+                    { type: 'p', id: 'empty-line12', text: '' },
+                    { type: 'p', id: 'prompt', text: 'ali@AOS:~$' }
+                ];
+
+                function runNextStep() {
+                    if (currentStep < cvContent.length) {
+                        const item = cvContent[currentStep];
+                        const element = document.createElement(item.type);
+                        element.id = item.id;
+
+                        let currentTypingSpeed = typingSpeedFast;
+
+                        if (item.id === 'username' || item.id === 'password') {
+                            currentTypingSpeed = typingSpeedSlow;
+                        } else if (currentStep >= 7 && currentStep <= 10) {
+                            currentTypingSpeed = typingSpeedInitialInfo;
+                        } else if (currentStep > 11) {
+                            currentTypingSpeed = typingSpeedCV;
+                        }
+
+                        if (item.id === 'login-prompt' || item.id === 'username' || item.id === 'password-prompt' || item.id === 'password' || item.id === 'auth-success' || item.id === 'last-login' || item.id === 'welcome' || (currentStep >= 7 && currentStep <= 10)) {
+                            loginInfo.appendChild(element);
+                            if (item.id === 'initial-links') {
+                                element.innerHTML = item.text;
+                                currentStep++;
+                                runNextStep();
+                            } else {
+                                typeWriter(item.id, item.text, currentTypingSpeed, () => {
+                                    currentStep++;
+                                    runNextStep();
+                                });
+                            }
+                        } else if (item.id === 'prompt') {
+                            terminalOutput.appendChild(element);
+                            element.textContent = item.text;
+                            element.innerHTML += '<span class="blinking-cursor">_</span>';
+                            currentStep++;
+                        }
+                        else {
+                            terminalOutput.appendChild(element);
+                            typeWriter(item.id, item.text, currentTypingSpeed, () => {
+                                currentStep++;
+                                runNextStep();
+                            });
+                        }
+                    }
+                }
+
+                runNextStep();
+
+            }, loadingDuration);
+        });
+    </script>
+</body>
+
+</html>
